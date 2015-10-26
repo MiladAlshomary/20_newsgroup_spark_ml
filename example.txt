@@ -1,0 +1,33 @@
+hardware_rdd= sc.textFile("/mini_newsgroups/comp.sys.mac.hardware/*")
+graphics_rdd = sc.textFile("/mini_newsgroups/comp.graphics/*")
+autos_rdd    = sc.textFile("/mini_newsgroups/rec.autos/*")
+
+hardware_rdd = hardware_rdd.map().map(lambda line : (line, 1))
+graphics_rdd = graphics_rdd.map().map(lambda line : (line, 2))
+autos_rdd      = autos_rdd.map().map(lambda line : (line, 3))
+
+news_rdd = sc.union([hardware_rdd, graphics_rdd, autos_rdd])
+news_rdd_training, news_rdd_testing  = all_rdds.randomSplit([0.7,0.3], 1)
+
+features = news_rdds_training.map(lambda item : item[0].split(" "))
+labels = all_rdds_training.map(lambda item : item[1])
+hashingTF = HashingTF()
+tf = hashingTF.transform(features)
+tf.cache()
+idf = IDF().fit(tf)
+tf_idf_rdd = idf.transform(tf)
+
+training = labels.zip(tf_idf_rdd).map(lambda x: LabeledPoint(x[0], x[1]))
+ model = NaiveBayes.train(training)
+ 
+
+testing_features = news_rdd_testing.map(lambda item : item[0].split(" "))
+testing_labels   = all_rdds_testing.map(lambda item : item[1])
+hashingTF = HashingTF()
+testing_tf = hashingTF.transform(testing_features)
+testing_tf.cache()
+testing_idf = IDF().fit(testing_tf)
+testing_tfidf = testing_idf.transform(testing_tf)
+predicts = model.predict(testing_tfidf)
+results  = testing_labels.zip(predicts).map(lambda x: (x[0], x[1]))
+train_erorr = results.filter(lambda (x,y) : x != y).count() / float(results.count())
